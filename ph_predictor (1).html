@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>pH 예측기</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f5f4f0;
+    --surface: #ffffff;
+    --surface2: #f0efe9;
+    --border: rgba(0,0,0,0.1);
+    --text: #1a1a18;
+    --text2: #6b6b65;
+    --accent: #1a6b3a;
+    --accent-light: #e4f0e8;
+    --radius: 12px;
+    --ph-acid: #d85a30;
+    --ph-neutral: #1d9e75;
+    --ph-base: #185fa5;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1c1a;
+      --surface: #252523;
+      --surface2: #2e2e2b;
+      --border: rgba(255,255,255,0.1);
+      --text: #f0efe9;
+      --text2: #a0a09a;
+      --accent: #5DCAA5;
+      --accent-light: #04342c;
+    }
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  header {
+    background: var(--surface);
+    border-bottom: 0.5px solid var(--border);
+    padding: 1.5rem 2rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .logo {
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    background: var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    color: white;
+    font-size: 20px;
+    font-weight: 500;
+    flex-shrink: 0;
+  }
+
+  header h1 { font-size: 18px; font-weight: 500; }
+  header p { font-size: 13px; color: var(--text2); margin-top: 2px; }
+
+  .main {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    gap: 1.5rem;
+    align-items: start;
+  }
+
+  @media (max-width: 800px) {
+    .main { grid-template-columns: 1fr; }
+  }
+
+  .card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+  }
+
+  .card-title {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text2);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-bottom: 1.25rem;
+  }
+
+  .section-label {
+    font-size: 11px;
+    color: var(--text2);
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin: 1.25rem 0 0.75rem;
+    display: flex; align-items: center; gap: 6px;
+  }
+
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 0.5px;
+    background: var(--border);
+  }
+
+  .input-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .input-group label {
+    display: block;
+    font-size: 12px;
+    color: var(--text2);
+    margin-bottom: 4px;
+  }
+
+  .input-group input {
+    width: 100%;
+    padding: 8px 10px;
+    background: var(--surface2);
+    border: 0.5px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 14px;
+    font-family: inherit;
+    transition: border-color 0.15s;
+  }
+
+  .input-group input:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  .color-preview {
+    width: 100%;
+    height: 56px;
+    border-radius: 10px;
+    border: 0.5px solid var(--border);
+    margin-bottom: 1rem;
+    transition: background 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    color: rgba(255,255,255,0.8);
+    font-weight: 500;
+    letter-spacing: 0.03em;
+  }
+
+  .predict-btn {
+    width: 100%;
+    padding: 11px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.1s;
+    margin-top: 1.25rem;
+    font-family: inherit;
+  }
+
+  .predict-btn:hover { opacity: 0.9; }
+  .predict-btn:active { transform: scale(0.98); }
+
+  .result-card {
+    margin-top: 1rem;
+    padding: 1.25rem;
+    border-radius: 10px;
+    border: 0.5px solid var(--border);
+    background: var(--surface2);
+    display: none;
+  }
+
+  .result-card.visible { display: block; }
+
+  .ph-display {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 0.75rem;
+  }
+
+  .ph-number {
+    font-size: 48px;
+    font-weight: 500;
+    line-height: 1;
+    transition: color 0.3s;
+  }
+
+  .ph-label {
+    font-size: 14px;
+    color: var(--text2);
+  }
+
+  .ph-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    margin-bottom: 0.75rem;
+  }
+
+  .ph-bar-wrap {
+    position: relative;
+    height: 8px;
+    border-radius: 4px;
+    overflow: hidden;
+    background: linear-gradient(to right,
+      #d85a30 0%, #ef9f27 25%, #639922 45%, #1d9e75 50%, #1d9e75 55%, #185fa5 75%, #534ab7 100%
+    );
+    margin-bottom: 8px;
+  }
+
+  .ph-indicator {
+    position: absolute;
+    top: -4px;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 2.5px solid var(--text);
+    transform: translateX(-50%);
+    transition: left 0.5s cubic-bezier(0.34,1.56,0.64,1);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+  }
+
+  .ph-scale-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--text2);
+    margin-bottom: 0.75rem;
+  }
+
+  .info-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    padding: 5px 0;
+    border-top: 0.5px solid var(--border);
+  }
+
+  .info-row span:first-child { color: var(--text2); }
+
+  .right-col { display: flex; flex-direction: column; gap: 1.5rem; }
+
+  .chart-wrap { position: relative; height: 260px; }
+
+  .knn-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-top: 0.5rem;
+  }
+
+  .knn-item {
+    background: var(--surface2);
+    border: 0.5px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 12px;
+  }
+
+  .knn-ph {
+    font-size: 18px;
+    font-weight: 500;
+    margin-bottom: 2px;
+  }
+
+  .knn-dist { color: var(--text2); font-size: 11px; }
+
+  .knn-color {
+    width: 24px; height: 24px;
+    border-radius: 6px;
+    display: inline-block;
+    margin-bottom: 4px;
+    border: 0.5px solid var(--border);
+  }
+
+  .examples {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    gap: 8px;
+    margin-top: 0.5rem;
+  }
+
+  .example-btn {
+    background: var(--surface2);
+    border: 0.5px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+    cursor: pointer;
+    text-align: center;
+    font-family: inherit;
+    color: var(--text);
+    transition: border-color 0.15s, background 0.15s;
+  }
+
+  .example-btn:hover {
+    border-color: var(--accent);
+    background: var(--accent-light);
+  }
+
+  .example-dot {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    margin: 0 auto 6px;
+    border: 0.5px solid var(--border);
+  }
+
+  .example-ph { font-size: 13px; font-weight: 500; }
+  .example-name { font-size: 11px; color: var(--text2); margin-top: 2px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">pH</div>
+  <div>
+    <h1>pH 색상 예측기</h1>
+    <p>RGB · HSV · Lab 값을 입력하면 pH를 예측합니다</p>
+  </div>
+</header>
+
+<div class="main">
+  <!-- 입력 패널 -->
+  <div>
+    <div class="card">
+      <div class="card-title">색상 값 입력</div>
+
+      <div class="color-preview" id="colorPreview">
+        색상 미리보기
+      </div>
+
+      <div class="section-label">RGB</div>
+      <div class="input-row">
+        <div class="input-group">
+          <label>R <span style="color:var(--text2)">(0–255)</span></label>
+          <input type="number" id="R" min="0" max="255" value="255" oninput="updatePreview()">
+        </div>
+        <div class="input-group">
+          <label>G <span style="color:var(--text2)">(0–255)</span></label>
+          <input type="number" id="G" min="0" max="255" value="29" oninput="updatePreview()">
+        </div>
+        <div class="input-group">
+          <label>B <span style="color:var(--text2)">(0–255)</span></label>
+          <input type="number" id="B" min="0" max="255" value="33" oninput="updatePreview()">
+        </div>
+      </div>
+
+      <div class="section-label">HSV</div>
+      <div class="input-row">
+        <div class="input-group">
+          <label>H <span style="color:var(--text2)">(0–360)</span></label>
+          <input type="number" id="H" min="0" max="360" value="178" oninput="updatePreview()">
+        </div>
+        <div class="input-group">
+          <label>S <span style="color:var(--text2)">(0–255)</span></label>
+          <input type="number" id="S" min="0" max="255" value="226">
+        </div>
+        <div class="input-group">
+          <label>V <span style="color:var(--text2)">(0–255)</span></label>
+          <input type="number" id="V" min="0" max="255" value="255">
+        </div>
+      </div>
+
+      <div class="section-label">Lab</div>
+      <div class="input-row">
+        <div class="input-group">
+          <label>L</label>
+          <input type="number" id="L" value="138.46">
+        </div>
+        <div class="input-group">
+          <label>a</label>
+          <input type="number" id="La" value="205.71">
+        </div>
+        <div class="input-group">
+          <label>b</label>
+          <input type="number" id="Lb" value="185.46">
+        </div>
+      </div>
+
+      <button class="predict-btn" onclick="predict()">예측하기</button>
+
+      <!-- 결과 -->
+      <div class="result-card" id="resultCard">
+        <div class="ph-display">
+          <span class="ph-number" id="phNumber">—</span>
+          <span class="ph-label">pH</span>
+        </div>
+        <div id="phBadge" class="ph-badge"></div>
+        <div class="ph-bar-wrap">
+          <div class="ph-indicator" id="phIndicator" style="left:50%"></div>
+        </div>
+        <div class="ph-scale-labels">
+          <span>0 산성</span><span>7 중성</span><span>14 염기성</span>
+        </div>
+        <div class="info-row">
+          <span>색상 기준식 pH</span>
+          <span id="theoryPh">—</span>
+        </div>
+        <div class="info-row">
+          <span>예측 방법</span>
+          <span>k-NN (k=5)</span>
+        </div>
+        <div class="info-row">
+          <span>학습 데이터</span>
+          <span>270개 샘플</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 예시 버튼 -->
+    <div class="card" style="margin-top:1rem">
+      <div class="card-title">예시 데이터</div>
+      <div class="examples" id="exampleBtns"></div>
+    </div>
+  </div>
+
+  <!-- 우측 -->
+  <div class="right-col">
+    <!-- 분포 차트 -->
+    <div class="card">
+      <div class="card-title">pH별 데이터 분포 (학습 데이터)</div>
+      <div class="chart-wrap">
+        <canvas id="distChart" role="img" aria-label="pH별 데이터 샘플 수 막대그래프. 각 pH(2~10)마다 30개씩 균일하게 분포.">각 pH 값(2~10)에 30개씩 총 270개 샘플이 있습니다.</canvas>
+      </div>
+    </div>
+
+    <!-- 가장 가까운 샘플 -->
+    <div class="card" id="knnCard" style="display:none">
+      <div class="card-title">가장 유사한 데이터 5개</div>
+      <div class="knn-grid" id="knnGrid"></div>
+    </div>
+
+    <!-- pH별 평균 색상 -->
+    <div class="card">
+      <div class="card-title">pH별 평균 색상</div>
+      <div style="display:flex; gap:4px; margin-top:0.25rem; border-radius:8px; overflow:hidden">
+        <div id="phColorBar" style="display:flex; width:100%; height:48px;"></div>
+      </div>
+      <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text2); margin-top:6px">
+        <span>pH 2 (강산성)</span><span>pH 10 (강염기성)</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const DB = [[255,29,33,178.47,226,255,138.46,205.71,185.46,2],[255,28,28,0,227,255,138.26,205.78,187.51,2],[255,33,27,0.79,228,255,138.94,204.99,188.09,2],[255,27,27,0,228,255,138.12,205.9,187.87,2],[255,20,21,178.87,235,255,137.29,206.7,189.88,2],[252,24,31,178.08,230.71,252,136.28,205.62,185.42,2],[250,22,37,177.04,232.56,250,135.13,205.48,182.16,2],[253,30,22,1.03,232.83,253,137.43,204.89,189.36,2],[252,30,24,0.79,230.71,252,136.95,204.66,188.42,2],[255,26,28,178.74,229,255,138.01,206.06,187.44,2],[255,57,37,2.74,218,255,143.85,199.84,185.39,2],[255,49,28,2.76,227,255,141.86,201.75,188.5,2],[255,27,27,0,228,255,138.12,205.9,187.87,2],[255,48,39,1.24,216,255,141.81,202.18,183.82,2],[255,40,26,1.82,229,255,140.06,203.69,188.77,2],[255,39,46,178.03,216,255,140.21,204.27,179.88,2],[255,28,40,177.42,227,255,138.45,205.99,182.22,2],[255,37,42,178.32,218,255,139.8,204.55,181.71,2],[255,50,31,2.53,224,255,142.12,201.55,187.39,2],[255,45,45,0,210,255,141.31,203,180.77,2],[152,8,2,1.19,251.64,152,80.26,181.3,172.35,2],[148,14,17,178.33,230.88,148,79.06,179.49,165.06,2],[155,15,11,0.83,236.9,155,83.03,181.16,169.72,2],[151,11,18,177.51,236.42,151,80.32,180.84,165.22,2],[155,18,0,3.46,255,155,83.41,180.44,174.3,2],[160,10,7,0.58,243.84,160,85.09,183.26,172.4,2],[156,0,8,177.47,255,156,81.62,183.59,170.69,2],[157,18,6,2.37,245.25,157,84.59,181.09,172.36,2],[150,6,14,177.34,244.8,150,79.03,181.22,166.74,2],[157,6,12,177.81,245.25,157,82.98,183.07,169.49,2],[255,84,16,8.49,239,255,151.89,190.56,194.8,3],[253,78,12,8.17,242.91,253,148.87,192.13,194.8,3],[255,81,20,7.74,235,255,150.86,191.74,193.52,3],[253,72,17,6.95,237.87,253,146.93,194.3,193.19,3],[253,75,19,7.14,235.85,253,147.92,193.28,192.89,3],[255,89,20,8.76,235,255,153.77,188.64,194.26,3],[255,79,10,8.4,245,255,150.1,192.38,195.65,3],[254,80,32,6.45,222.87,254,150.19,191.97,189.32,3],[254,81,19,7.87,235.93,254,150.41,191.41,193.59,3],[249,85,23,8.18,231.45,249,149.69,188.28,191.85,3],[255,90,38,7.15,217,255,154.36,188.54,188.36,3],[255,102,44,8.2,211,255,159.29,183.63,187.56,3],[255,93,27,8.64,228,255,155.39,187.11,192.65,3],[255,85,27,7.59,228,255,152.35,190.31,191.79,3],[255,101,19,10.37,236,255,158.58,183.6,195.75,3],[255,91,24,8.65,231,255,154.58,187.88,193.35,3],[255,88,28,7.89,227,255,153.47,189.15,191.78,3],[255,85,28,7.49,227,255,152.36,190.33,191.46,3],[255,104,17,10.91,238,255,159.84,182.26,196.54,3],[255,102,29,9.64,226,255,159.09,183.31,193.07,3],[157,44,0,8.36,255,157,91.62,173.2,176.33,3],[157,43,0,8.17,255,157,91.26,173.59,176.26,3],[166,44,0,7.91,255,166,96.09,176.26,178.16,3],[159,36,7,5.69,243.77,159,90.02,176.89,173.45,3],[162,37,8,5.62,242.41,162,91.88,177.53,173.83,3],[158,46,14,6.63,232.41,158,93.01,172.97,171.57,3],[154,37,0,7.17,255,154,87.69,174.81,175.2,3],[150,41,5,7.41,246.5,150,87.1,172.04,172.62,3],[157,46,3,8.33,250.13,157,92.4,172.45,175.3,3],[164,40,19,4.32,225.46,164,93.98,177.33,170.25,3],[255,135,0,15.79,255,255,174.56,167.35,202.86,4],[255,138,3,15.98,252,255,176.14,165.86,202.83,4],[255,139,0,16.26,255,255,176.66,165.33,203.36,4],[247,137,4,16.33,250.87,247,172.85,163.17,201.34,4],[255,133,0,15.56,255,255,173.53,168.35,202.61,4],[255,135,0,15.79,255,255,174.56,167.35,202.86,4],[255,134,1,15.62,254,255,174.05,167.86,202.6,4],[255,145,5,16.71,250,255,179.89,162.32,203.5,4],[248,135,2,16.13,252.94,248,172.12,164.58,201.5,4],[255,142,19,15.55,236,255,178.34,163.98,201.02,4],[255,173,12,19.77,243,255,195.81,147.86,206.86,4],[255,161,11,18.34,244,255,188.82,154.1,205.09,4],[255,162,1,18.91,254,255,189.36,153.5,206.39,4],[255,182,0,21.29,255,255,201.14,143.06,209.57,4],[255,151,1,17.62,254,255,183.16,159.21,204.82,4],[255,164,0,19.19,255,255,190.51,152.45,206.8,4],[255,169,0,19.77,255,255,193.41,149.85,207.55,4],[255,164,0,19.19,255,255,190.51,152.45,206.8,4],[255,169,0,19.77,255,255,193.41,149.85,207.55,4],[255,158,11,17.97,244,255,187.12,155.66,204.64,4],[150,80,0,15.91,255,150,106,152.72,178.83,4],[160,73,0,13.61,255,160,106.07,160.8,179.64,4],[152,77,0,15.11,255,152,105.04,155.26,178.75,4],[158,73,0,13.78,255,158,105.25,159.97,179.29,4],[168,87,0,15.45,255,168,116.87,156.68,182.79,4],[152,88,0,17.27,255,152,111.53,149.1,180.33,4],[158,85,0,16.05,255,158,111.94,153.45,180.86,4],[155,61,0,11.74,255,155,97.89,164.89,177.39,4],[154,73,0,14.14,255,154,103.62,158.29,178.58,4],[147,78,0,15.83,255,147,103.68,152.52,178.04,4],[255,212,35,24,220,255,219.92,128.02,210.08,5],[255,215,32,24.48,223,255,221.8,126.44,211.28,5],[255,216,30,24.66,225,255,222.43,125.9,211.85,5],[253,220,33,25.36,221.74,253,224.54,123.09,211.85,5],[255,213,40,24.01,215,255,220.59,127.63,209.17,5],[245,219,32,26.19,221.69,245,222.07,120.19,210.97,5],[255,216,28,24.71,227,255,222.42,125.86,212.2,5],[252,217,34,25.04,220.6,252,222.39,124.2,210.94,5],[255,216,34,24.57,221,255,222.45,125.97,211.08,5],[255,224,33,25.67,222,255,227.58,121.93,212.87,5],[255,247,43,28.71,212,255,242.62,110.85,215.61,5],[255,251,38,29.28,217,255,245.21,108.81,217.46,5],[255,247,42,28.71,213,255,242.61,110.82,215.83,5],[255,250,46,29.12,209,255,244.61,109.48,215.6,5],[255,255,48,29.83,207,255,247.93,107.15,216.24,5],[255,255,35,29.83,220,255,247.83,106.84,218.84,5],[255,250,38,29.15,217,255,244.55,109.29,217.25,5],[255,245,54,28.35,201,255,241.4,112.12,212.56,5],[255,242,47,27.97,208,255,239.37,113.37,213.64,5],[255,255,43,29.83,212,255,247.89,107.02,217.32,5],[155,127,9,24.11,240.19,155,138.22,128.42,185.92,5],[151,138,8,27.12,241.49,151,144.98,120.48,187.92,5],[150,131,11,25.76,236.3,150,139.75,123.9,185.81,5],[152,128,10,24.79,238.22,152,138.14,126.48,185.59,5],[157,129,6,24.3,245.25,157,140.13,128.18,187.1,5],[157,124,1,23.52,253.38,157,136.64,130.9,187.02,5],[151,131,11,25.57,236.42,151,140.01,124.36,185.93,5],[164,138,8,24.86,242.56,164,148.21,126.48,189.43,5],[155,126,9,23.91,240.19,155,137.53,128.98,185.72,5],[154,134,4,25.86,248.38,154,142.85,123.99,188.09,5],[182,227,49,37.38,199.96,227,215.57,90.92,202.91,6],[182,223,47,36.78,201.26,223,212.68,92.65,202.44,6],[181,220,50,36.68,197.05,220,210.39,93.75,200.75,6],[176,220,52,37.65,194.73,220,209.6,91.87,199.76,6],[187,224,60,36.56,186.7,224,214.38,94.74,199.26,6],[176,224,50,38.06,198.08,224,212.47,89.98,201.38,6],[190,215,45,34.22,201.63,215,208.32,99.49,201.66,6],[177,209,47,35.73,197.66,209,201.78,97.11,198.44,6],[176,220,51,37.6,195.89,220,209.59,91.82,200.05,6],[189,224,47,35.73,201.5,224,214.56,94.96,203.27,6],[205,255,49,37.07,206,255,239.09,87.33,211.67,6],[227,255,56,34.03,199,255,242.81,96.14,211.72,6],[199,255,59,38.36,196,255,238.27,85.44,208.62,6],[222,239,55,32.59,196.32,239,230.95,101.54,207.69,6],[213,252,56,35.77,198.33,252,238.36,92,209.8,6],[217,243,58,34.03,194.14,243,232.83,97.77,207.37,6],[213,255,65,36.43,190,255,240.55,91.03,208,6],[204,239,70,36.01,180.31,239,227.97,95.03,201.45,6],[215,246,72,35.15,180.37,246,234.74,96.23,203.61,6],[213,255,60,36.26,195,255,240.49,90.81,209.45,6],[119,143,21,35.7,217.55,143,142.05,103.73,183.3,6],[112,136,30,36.59,198.75,136,135.43,104.58,178.1,6],[101,137,28,39.69,202.88,137,134.3,99.33,178.09,6],[96,125,10,37.36,234.6,125,123.63,102.37,179.04,6],[105,137,31,38.84,197.3,137,135,101.15,177.43,6],[107,142,14,37.99,229.86,142,139.12,98.89,183.58,6],[96,132,24,39.78,208.64,132,129.42,99.47,177.48,6],[106,120,21,34.05,210.38,120,121.61,109.74,175.9,6],[99,137,24,39.87,210.33,137,133.92,98.32,179.15,6],[101,129,16,37.23,223.37,129,127.76,102.73,179.23,6],[79,204,75,58.74,161.25,204,186.47,68.78,180.63,7],[82,197,76,58.19,156.62,197,181.15,72.11,177.88,7],[79,194,77,59.16,153.79,194,178.55,72.61,176.25,7],[74,209,80,60.99,164.71,209,190.21,66.48,180.09,7],[76,201,79,60.38,158.58,201,183.96,69.61,177.76,7],[78,203,83,60.86,157.02,203,185.8,69.79,176.81,7],[77,197,78,59.92,155.33,197,180.82,71.16,176.81,7],[68,192,86,64,164.69,192,176.41,72.01,171.03,7],[88,198,82,58.12,149.39,198,182.59,73.89,175.89,7],[81,215,85,60.56,158.93,215,195.54,66.4,180.33,7],[101,222,80,55.25,163.11,222,202.41,68.08,185.64,7],[104,223,81,54.83,162.38,223,203.46,68.58,185.71,7],[97,221,106,61.83,143.08,221,201.98,70.4,173.83,7],[110,229,104,58.23,139.19,229,209.17,70.37,178.26,7],[103,223,105,60.16,137.22,223,203.99,70.99,175.3,7],[107,221,91,55.99,150,221,202.42,71.14,180.99,7],[95,218,100,60.88,143.88,218,199.32,70.27,175.37,7],[118,218,97,54.49,141.54,218,201.34,76.05,177.9,7],[97,226,88,57.72,155.71,226,205.37,66.44,183.53,7],[96,230,86,57.59,159.65,230,208.34,64.57,185.68,7],[43,119,40,58.53,169.29,119,112.28,88.15,163.6,7],[36,116,46,63.4,175.86,116,109.29,88.44,159.26,7],[45,114,42,58.42,161.05,114,108.11,90.91,160.81,7],[46,109,45,59.2,149.72,109,103.9,93.67,157.37,7],[38,123,37,59.32,178.29,123,115.35,85.13,166.24,7],[31,110,42,63.82,183.14,110,103.5,89.16,158.61,7],[43,114,45,60.51,158.82,114,108.03,90.76,159.24,7],[32,119,34,60.35,186.43,119,111.37,85.05,165.84,7],[38,120,36,58.96,178.5,120,112.69,86.15,165.56,7],[39,126,38,59.33,178.1,126,118.07,84.34,166.95,7],[34,174,122,78.42,205.17,174,161.56,79.87,144.73,8],[37,167,116,77.8,198.5,167,155.64,81.65,144.83,8],[32,178,121,77.85,209.16,178,164.69,77.88,146.96,8],[26,180,119,77.68,218.17,180,166.04,76.14,148.76,8],[35,181,121,77.24,205.69,181,167.23,77.03,148.33,8],[27,177,117,77.57,216.1,177,163.53,76.93,148.5,8],[31,177,121,78.06,210.34,177,163.84,78.16,146.51,8],[40,184,118,75.83,199.57,184,169.7,75.81,151.27,8],[36,177,109,75.11,203.14,177,163.45,76.17,152.78,8],[24,170,118,78.87,219,170,157.77,79.59,144.85,8],[48,221,139,75.36,199.62,221,200.38,67.19,156.44,8],[46,214,119,72.63,200.19,214,193.98,65.81,163.3,8],[49,214,125,73.41,196.61,214,194.33,67.21,160.46,8],[57,210,133,74.49,185.79,210,191.85,71.22,155.09,8],[53,226,138,74.32,195.2,226,204.43,65.78,159.08,8],[49,204,130,75.26,193.75,204,186.62,71.8,153.88,8],[54,201,137,76.51,186.49,201,184.8,75.03,149.24,8],[44,211,139,76.64,201.82,211,192.38,70.42,152.21,8],[56,203,134,75.5,184.66,203,186.33,73.92,151.64,8],[40,204,140,77.86,205,204,186.76,72.84,148.66,8],[14,101,73,79.9,219.65,101,95.95,96.34,137.08,8],[17,109,79,79.77,215.23,109,103.54,94.69,137.63,8],[4,99,57,76.31,244.7,99,92.95,92.34,145.05,8],[18,110,67,75.56,213.27,110,103.81,91.51,144.89,8],[11,100,82,83.47,226.95,100,95.55,98.99,131.35,8],[10,107,72,78.74,231.17,107,101.13,93.1,140.49,8],[12,108,63,75.52,226.67,108,101.62,90.79,146.06,8],[12,118,76,77.68,229.07,118,111.15,89.67,143.51,8],[19,103,62,74.94,207.96,103,97.34,93.44,144.43,8],[8,107,74,79.56,235.93,107,101.19,93.43,139.32,8],[11,147,199,97.75,240.9,199,145.69,114.45,92.19,9],[17,134,191,99.27,232.3,191,134.82,119.1,90.05,9],[24,140,193,98.86,223.29,193,139.9,116.82,92.04,9],[13,138,208,100.21,239.06,208,139.94,122.99,83.57,9],[18,132,198,100.44,231.82,198,134.2,122.95,85.67,9],[18,126,199,101.53,231.93,199,129.76,126.91,82.35,9],[18,143,209,99.81,233.04,209,143.97,120.68,85.51,9],[25,138,194,99.39,222.14,194,138.51,118.39,90.62,9],[32,140,200,100.15,214.2,200,141.04,119.97,88.78,9],[19,140,199,99.28,230.65,199,140.48,118.74,88.99,9],[32,159,224,99.6,218.57,224,158.27,117.91,85.97,9],[32,158,225,99.86,218.73,225,157.64,118.83,85.03,9],[34,176,203,94.27,212.29,203,169.04,101.83,104.15,9],[45,173,208,95.91,199.83,208,167.65,105.97,100.56,9],[34,161,213,98.17,214.3,213,158.6,113.05,92.27,9],[30,155,239,101.49,222.99,239,157.1,125.5,76.96,9],[44,174,230,98.48,206.22,230,170.63,112.75,90.26,9],[27,159,228,99.74,224.8,228,158.59,119.03,83.95,9],[27,169,223,97.72,224.13,223,165.52,111.76,90.97,9],[34,169,228,98.57,216.97,228,166.29,113.96,88.69,9],[0,87,113,96.36,255,113,86.7,115.77,106.87,9],[6,84,118,98.56,242.03,118,84.97,120.03,102.71,9],[4,73,125,102.32,246.84,125,76.72,129.9,93.23,9],[1,77,126,101.19,252.98,126,80.05,127.46,94.69,9],[0,72,110,99.81,255,110,73.44,123.87,100.61,9],[6,73,130,103.21,243.23,130,77.61,132.16,90.68,9],[0,91,121,96.9,255,121,91.08,116.55,104.59,9],[2,77,122,100.69,250.82,122,79.49,125.84,96.83,9],[2,87,120,97.84,250.75,120,87.63,118.7,103.1,9],[3,78,119,100.04,248.57,119,79.93,124.01,98.98,9],[31,51,193,115.65,214.04,193,78.18,173.26,53.02,10],[33,60,199,114.48,212.71,199,84.92,170.09,53.87,10],[30,61,197,113.8,216.17,197,84.73,168.57,54.92,10],[26,60,195,113.33,221,195,83.33,168.23,55.18,10],[32,51,205,116.06,215.2,205,81.58,177.4,48.21,10],[32,61,204,114.3,215,204,86.67,171.2,52.09,10],[38,65,190,114.03,204,190,86.17,164.07,59.96,10],[23,56,200,113.77,225.68,200,82.14,172.34,51.48,10],[32,56,200,115.07,214.2,200,82.85,172.8,51.95,10],[26,56,192,113.94,220.47,192,80.24,169.62,54.94,10],[40,65,217,115.12,208,217,92.93,173.86,48.64,10],[56,68,246,117.45,196.95,246,103.57,182.97,39.08,10],[51,77,218,114.69,195.34,218,101.24,167.79,53.44,10],[53,71,225,116.21,194.93,225,99.62,174.04,48.4,10],[68,75,234,118.08,180.9,234,105.91,176.15,47.37,10],[42,75,239,114.34,210.19,239,104.1,175.66,43.34,10],[42,90,230,111.72,208.43,230,111,163.19,52.87,10],[43,81,232,113.34,207.74,232,106,169.63,48.52,10],[52,63,219,117.37,194.45,219,93.68,176.61,48,10],[46,75,229,114.61,203.78,229,102.07,172.46,47.7,10],[10,20,122,116.67,234.1,122,39.08,165.24,71.07,10],[13,32,126,114.32,228.69,126,47.1,159.58,73.73,10],[14,31,119,114.5,225,119,44.58,157.59,76.57,10],[0,31,121,111.69,255,121,44.05,157.63,74.93,10],[11,21,113,116.41,230.18,113,36.71,161.5,75.34,10],[15,28,124,115.78,224.15,124,44.37,161.5,73.23,10],[9,29,125,114.19,236.64,125,44.72,160.94,72.82,10],[6,29,117,113.15,241.92,117,42.1,157.7,76.24,10],[6,27,121,113.89,242.36,121,42.12,160.55,73.68,10],[6,36,114,111.05,241.58,114,45.86,151.61,80.61,10]];
+
+const PH_COLORS = {
+  2: '#dc1c1c', 3: '#e8471a', 4: '#e88a00', 5: '#d4c200',
+  6: '#7ab800', 7: '#1da84a', 8: '#0d9e7a', 9: '#0d6eb5', 10: '#2b3fce'
+};
+
+const EXAMPLES = [
+  {name:'강산성', ph:2, R:255,G:29,B:33,H:178,S:226,V:255,L:138.46,La:205.71,Lb:185.46},
+  {name:'산성',   ph:4, R:255,G:135,B:0,H:16,S:255,V:255,L:174.56,La:167.35,Lb:202.86},
+  {name:'약산성', ph:6, R:182,G:227,B:49,H:37,S:200,V:227,L:215.57,La:90.92,Lb:202.91},
+  {name:'중성',   ph:7, R:79,G:204,B:75,H:59,S:161,V:204,L:186.47,La:68.78,Lb:180.63},
+  {name:'약염기', ph:8, R:34,G:174,B:122,H:78,S:205,V:174,L:161.56,La:79.87,Lb:144.73},
+  {name:'강염기', ph:10,R:31,G:51,B:193,H:116,S:214,V:193,L:78.18,La:173.26,Lb:53.02},
+];
+
+function normalize(data) {
+  const n = data.length;
+  const mins = Array(9).fill(Infinity), maxs = Array(9).fill(-Infinity);
+  for (const r of data) for (let i = 0; i < 9; i++) {
+    if (r[i] < mins[i]) mins[i] = r[i];
+    if (r[i] > maxs[i]) maxs[i] = r[i];
+  }
+  return { mins, maxs };
+}
+
+const { mins, maxs } = normalize(DB);
+
+function normVal(v, i) {
+  const range = maxs[i] - mins[i];
+  return range === 0 ? 0 : (v - mins[i]) / range;
+}
+
+function dist(a, b) {
+  let d = 0;
+  for (let i = 0; i < 9; i++) {
+    const diff = normVal(a[i], i) - normVal(b[i], i);
+    d += diff * diff;
+  }
+  return Math.sqrt(d);
+}
+
+function knn(query, k = 5) {
+  const dists = DB.map(row => ({
+    d: dist(query, row),
+    ph: row[9],
+    R: row[0], G: row[1], B: row[2]
+  }));
+  dists.sort((a, b) => a.d - b.d);
+  const top = dists.slice(0, k);
+  const phPred = top.reduce((s, x) => s + x.ph, 0) / k;
+  return { phPred, top };
+}
+
+function theoryPh(R, G, B) {
+  const ratio = (R - B) / (R + G + B + 1e-12);
+  return Math.max(0, Math.min(14, 7 - 5 * ratio));
+}
+
+function updatePreview() {
+  const R = +document.getElementById('R').value || 0;
+  const G = +document.getElementById('G').value || 0;
+  const B = +document.getElementById('B').value || 0;
+  const hex = '#' + [R,G,B].map(v => Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0')).join('');
+  const lum = 0.299*R + 0.587*G + 0.114*B;
+  const preview = document.getElementById('colorPreview');
+  preview.style.background = hex;
+  preview.style.color = lum > 128 ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.8)';
+  preview.textContent = `R:${R} G:${G} B:${B} → ${hex}`;
+}
+
+function predict() {
+  const R = +document.getElementById('R').value;
+  const G = +document.getElementById('G').value;
+  const B = +document.getElementById('B').value;
+  const H = +document.getElementById('H').value;
+  const S = +document.getElementById('S').value;
+  const V = +document.getElementById('V').value;
+  const L = +document.getElementById('L').value;
+  const La = +document.getElementById('La').value;
+  const Lb = +document.getElementById('Lb').value;
+
+  const query = [R,G,B,H,S,V,L,La,Lb];
+  const { phPred, top } = knn(query, 5);
+  const theory = theoryPh(R, G, B);
+
+  const rounded = Math.round(phPred * 10) / 10;
+
+  // 결과 표시
+  document.getElementById('resultCard').classList.add('visible');
+  document.getElementById('phNumber').textContent = rounded.toFixed(1);
+  document.getElementById('phNumber').style.color =
+    rounded < 6 ? '#d85a30' : rounded > 8 ? '#185fa5' : '#1d9e75';
+  document.getElementById('theoryPh').textContent = theory.toFixed(2);
+
+  const badge = document.getElementById('phBadge');
+  if (rounded < 6.5) {
+    badge.textContent = '산성';
+    badge.style.background = '#faece7'; badge.style.color = '#993c1d';
+  } else if (rounded > 7.5) {
+    badge.textContent = '염기성';
+    badge.style.background = '#e6f1fb'; badge.style.color = '#185fa5';
+  } else {
+    badge.textContent = '중성에 가까움';
+    badge.style.background = '#e1f5ee'; badge.style.color = '#0f6e56';
+  }
+
+  const pct = (rounded / 14 * 100).toFixed(1) + '%';
+  document.getElementById('phIndicator').style.left = pct;
+
+  // kNN 목록
+  document.getElementById('knnCard').style.display = 'block';
+  const grid = document.getElementById('knnGrid');
+  grid.innerHTML = top.map((x, i) => {
+    const hex = '#' + [x.R,x.G,x.B].map(v => Math.round(v).toString(16).padStart(2,'0')).join('');
+    return `<div class="knn-item">
+      <span class="knn-color" style="background:${hex};display:block"></span>
+      <div class="knn-ph" style="color:${PH_COLORS[x.ph] || '#888'}">pH ${x.ph}</div>
+      <div class="knn-dist">거리 ${x.d.toFixed(3)}</div>
+    </div>`;
+  }).join('');
+}
+
+function fillExample(ex) {
+  document.getElementById('R').value = ex.R;
+  document.getElementById('G').value = ex.G;
+  document.getElementById('B').value = ex.B;
+  document.getElementById('H').value = ex.H;
+  document.getElementById('S').value = ex.S;
+  document.getElementById('V').value = ex.V;
+  document.getElementById('L').value = ex.L;
+  document.getElementById('La').value = ex.La;
+  document.getElementById('Lb').value = ex.Lb;
+  updatePreview();
+  predict();
+}
+
+// 예시 버튼 생성
+const exWrap = document.getElementById('exampleBtns');
+for (const ex of EXAMPLES) {
+  const hex = '#' + [ex.R,ex.G,ex.B].map(v=>v.toString(16).padStart(2,'0')).join('');
+  const btn = document.createElement('button');
+  btn.className = 'example-btn';
+  btn.innerHTML = `<div class="example-dot" style="background:${hex}"></div>
+    <div class="example-ph">pH ${ex.ph}</div>
+    <div class="example-name">${ex.name}</div>`;
+  btn.onclick = () => fillExample(ex);
+  exWrap.appendChild(btn);
+}
+
+// pH별 색상 바
+const bar = document.getElementById('phColorBar');
+for (let ph = 2; ph <= 10; ph++) {
+  const div = document.createElement('div');
+  div.style.flex = '1';
+  div.style.background = PH_COLORS[ph];
+  div.title = `pH ${ph}`;
+  bar.appendChild(div);
+}
+
+// 분포 차트
+new Chart(document.getElementById('distChart'), {
+  type: 'bar',
+  data: {
+    labels: ['pH 2','pH 3','pH 4','pH 5','pH 6','pH 7','pH 8','pH 9','pH 10'],
+    datasets: [{
+      label: '샘플 수',
+      data: [30,30,30,30,30,30,30,30,30],
+      backgroundColor: Object.values(PH_COLORS),
+      borderWidth: 0,
+      borderRadius: 4,
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: { label: ctx => ` ${ctx.raw}개` } }
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        max: 35,
+        ticks: { stepSize: 10, color: '#888' },
+        grid: { color: 'rgba(128,128,128,0.1)' }
+      },
+      x: {
+        ticks: { color: '#888', font: { size: 12 } },
+        grid: { display: false }
+      }
+    }
+  }
+});
+
+updatePreview();
+</script>
+</body>
+</html>
