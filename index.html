@@ -237,10 +237,26 @@
       <div class="card">
         <div class="card-title">감지된 색상</div>
         <div style="height:52px;border-radius:9px;border:0.5px solid var(--border);margin-bottom:10px;transition:background 0.2s" id="camColorPreview"></div>
-        <div class="rgb-readout">
+
+        <div style="font-size:10px;font-weight:500;color:var(--text2);letter-spacing:0.07em;text-transform:uppercase;margin-bottom:5px">RGB</div>
+        <div class="rgb-readout" style="margin-bottom:10px">
           <div class="rgb-chip"><div class="val" id="camR" style="color:#d85a30">—</div><div class="lbl">R</div></div>
           <div class="rgb-chip"><div class="val" id="camG" style="color:#639922">—</div><div class="lbl">G</div></div>
           <div class="rgb-chip"><div class="val" id="camB" style="color:#185fa5">—</div><div class="lbl">B</div></div>
+        </div>
+
+        <div style="font-size:10px;font-weight:500;color:var(--text2);letter-spacing:0.07em;text-transform:uppercase;margin-bottom:5px">HSV</div>
+        <div class="rgb-readout" style="margin-bottom:10px">
+          <div class="rgb-chip"><div class="val" id="camH" style="color:#534ab7">—</div><div class="lbl">H</div></div>
+          <div class="rgb-chip"><div class="val" id="camS" style="color:#534ab7">—</div><div class="lbl">S</div></div>
+          <div class="rgb-chip"><div class="val" id="camV" style="color:#534ab7">—</div><div class="lbl">V</div></div>
+        </div>
+
+        <div style="font-size:10px;font-weight:500;color:var(--text2);letter-spacing:0.07em;text-transform:uppercase;margin-bottom:5px">Lab</div>
+        <div class="rgb-readout">
+          <div class="rgb-chip"><div class="val" id="camL" style="color:#0f6e56;font-size:14px">—</div><div class="lbl">L</div></div>
+          <div class="rgb-chip"><div class="val" id="camLa" style="color:#0f6e56;font-size:14px">—</div><div class="lbl">a</div></div>
+          <div class="rgb-chip"><div class="val" id="camLb" style="color:#0f6e56;font-size:14px">—</div><div class="lbl">b</div></div>
         </div>
       </div>
 
@@ -463,6 +479,13 @@ function updateCamResult(R,G,B){
 
   const hsv=rgbToHsv(R,G,B);
   const lab=rgbToLab(R,G,B);
+
+  document.getElementById('camH').textContent=hsv.H;
+  document.getElementById('camS').textContent=hsv.S;
+  document.getElementById('camV').textContent=hsv.V;
+  document.getElementById('camL').textContent=lab.L.toFixed(1);
+  document.getElementById('camLa').textContent=lab.a.toFixed(1);
+  document.getElementById('camLb').textContent=lab.b.toFixed(1);
   const q=[R,G,B,hsv.H,hsv.S,hsv.V,lab.L,lab.a,lab.b];
   const {phPred}=knn(q);
   const theory=theoryPh(R,G,B);
